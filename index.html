@@ -788,8 +788,7 @@ function renderDashboard(){
         <div class="pillar-check">${p4?'✓':'—'}</div>
       </div>
     </div>
-    ${pillarsTotal===4?'<div style="text-align:center;font-size:13px;font-weight:700;color:var(--gold)">🎉 All 4 pillars complete today — amazing!</div>':pillarsTotal===0?'<div style="font-size:12px;color:rgba(46,48,66,0.4);text-align:center">Tap "Check in" to log today's pillars</div>':''}
-  </div>`;
+    ${pillarsTotal===4?"<div style=\"text-align:center;font-size:13px;font-weight:700;color:var(--gold)\">🎉 All 4 pillars complete today — amazing!</div>":pillarsTotal===0?"<div style=\"font-size:12px;color:rgba(46,48,66,0.4);text-align:center\">Tap Check in to log your pillars</div>":""}  </div>`;
 
   html+=`<div class="section-title">Quick actions</div><div class="qa-grid">
     <div class="qa-btn" onclick="${progs.length?'showPage(\'log\')':' showPage(\'programs\');setTimeout(openProgModal,80)'}">
@@ -1184,8 +1183,7 @@ function saveFood(date,mi){
   const nut=getNut();if(!nut[date])nut[date]={meals:[]};nut[date].meals[mi].foods.push({name,cal,prot,carbs,fat});saveNut(nut);loadNutrition();
 }
 function addMeal(){
-  const name=prompt('Meal name:
-(e.g. Breakfast, Lunch, Dinner, Snack)');if(!name)return;
+  const name=prompt('Meal name (e.g. Breakfast, Lunch, Dinner, Snack):');if(!name)return;
   const date=document.getElementById('nut-date').value;const nut=getNut();if(!nut[date])nut[date]={meals:[]};nut[date].meals.push({name,foods:[]});saveNut(nut);loadNutrition();
 }
 function deleteFood(date,mi,fi){if(!confirm('Remove this food?'))return;const nut=getNut();nut[date].meals[mi].foods.splice(fi,1);saveNut(nut);loadNutrition();}
