@@ -413,6 +413,10 @@ textarea{min-height:60px;resize:none;line-height:1.4}
       <div class="more-item-left"><div class="more-icon" style="background:#e8f5e9">📊</div><div><div class="more-item-title">Wellbeing trends</div><div class="more-item-sub">Mood, energy &amp; wins journal</div></div></div>
       <div class="more-chevron">›</div>
     </div>
+    <div class="more-item" id="coach-dashboard-menu-item" style="display:none" onclick="returnToCoachDashboard()">
+      <div class="more-item-left"><div class="more-icon" style="background:var(--navy)">👔</div><div><div class="more-item-title">Coach dashboard</div><div class="more-item-sub">Switch to client management view</div></div></div>
+      <div class="more-chevron">›</div>
+    </div>
     <div class="more-item" onclick="exportData()">
       <div class="more-item-left"><div class="more-icon" style="background:#e8f5e9">📤</div><div><div class="more-item-title">Export data</div><div class="more-item-sub">Download workout & nutrition history as CSV</div></div></div>
       <div class="more-chevron">›</div>
@@ -640,7 +644,7 @@ textarea{min-height:60px;resize:none;line-height:1.4}
 
 <!-- COACH DASHBOARD PAGE -->
 <div id="p-coach" class="page" style="display:none">
-  <div class="top-bar"><h1>Coach dashboard</h1><button class="btn btn-sm" onclick="showPage('home')" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);color:#fff">My app</button></div>
+  <div class="top-bar"><h1>Coach dashboard</h1><button class="btn btn-sm" onclick="switchToMyApp()" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);color:#fff">💪 My app</button></div>
   <div class="page-content">
     <div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:12px">
@@ -2531,27 +2535,34 @@ function hideAuthScreen(){
 
 async function handleUser(user){
   _currentUser=user;
-  // Check if coach
+  // Check if coach — do this FIRST before anything else
   const {data:profile}=await _sb.from('profiles_data').select('data').eq('user_id',user.id).single();
   if(profile&&profile.data){
     _isCoach=profile.data.isCoach===true;
     sd('ft_profile',profile.data);
   }
-  // Check if they have local data to import
+  hideAuthScreen();
+  // Coach goes straight to coach dashboard regardless of local data
+  if(_isCoach){
+    await pullFromSupabase();
+    showCoachDashboard();
+    return;
+  }
+  // Client flow: check if they have local data to import
   const hasLocal=localStorage.getItem('ft_programs')||localStorage.getItem('ft_logs');
   const hasRemote=profile&&profile.data;
   if(hasLocal&&!hasRemote){
-    // First login with existing data - offer import
+    // First login with existing data — offer import, then go to app
     showImportPrompt();
+    const prof=getProfile();
+    if(!prof.name){
+      document.getElementById('onboarding').style.display='flex';
+    } else {
+      showPage('home');
+    }
   } else {
-    // Pull latest from Supabase
+    // Pull latest from Supabase then go to app
     await pullFromSupabase();
-  }
-  hideAuthScreen();
-  if(_isCoach){
-    showCoachDashboard();
-  } else {
-    // Check onboarding
     const prof=getProfile();
     if(!prof.name){
       document.getElementById('onboarding').style.display='flex';
@@ -2594,9 +2605,38 @@ async function showCoachDashboard(){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('p-coach').classList.add('active');
   document.getElementById('p-coach').style.display='block';
-  // Hide nav - coach has own nav
   document.querySelector('.nav-bar').style.display='none';
   await loadCoachDashboard();
+}
+
+function switchToMyApp(){
+  // Switch from coach dashboard to personal training app
+  document.getElementById('p-coach').classList.remove('active');
+  document.getElementById('p-coach').style.display='none';
+  document.querySelector('.nav-bar').style.display='flex';
+  // Show coach return options
+  const coachMenuItem=document.getElementById('coach-dashboard-menu-item');
+  if(coachMenuItem)coachMenuItem.style.display='flex';
+  showPage('home');
+  showCoachReturnBanner();
+}
+
+function showCoachReturnBanner(){
+  // Remove existing banner if any
+  const existing=document.getElementById('coach-return-banner');
+  if(existing)existing.remove();
+  const banner=document.createElement('div');
+  banner.id='coach-return-banner';
+  banner.style.cssText='position:fixed;bottom:calc(80px + env(safe-area-inset-bottom));left:16px;right:16px;z-index:400;background:var(--navy);border-radius:12px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 4px 16px rgba(46,48,66,0.3)';
+  banner.innerHTML=`<span style="color:#fff;font-size:13px;font-weight:600">👔 Coach mode active</span>
+    <button class="btn btn-sm btn-gold" onclick="returnToCoachDashboard()" style="background:var(--gold);color:#fff;border-color:var(--gold);font-size:12px">Coach dashboard →</button>`;
+  document.body.appendChild(banner);
+}
+
+async function returnToCoachDashboard(){
+  const banner=document.getElementById('coach-return-banner');
+  if(banner)banner.remove();
+  await showCoachDashboard();
 }
 
 async function loadCoachDashboard(){
