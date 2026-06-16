@@ -2410,6 +2410,24 @@ function renderSettings(){
   <button class="btn btn-primary" style="width:100%;margin-bottom:16px" onclick="saveSettings()">Save settings</button>
   <button class="btn btn-danger" style="width:100%;margin-bottom:16px" onclick="signOut()">Sign out</button>
   <div class="settings-section">
+    <div class="settings-section-title">Account</div>
+    <div class="settings-card">
+      <div class="settings-row" style="cursor:pointer" onclick="showChangePasswordForm()">
+        <span class="settings-row-label">Change password</span>
+        <span style="color:rgba(46,48,66,0.3)">›</span>
+      </div>
+    </div>
+    <div id="change-password-form" style="display:none;background:var(--white);border-radius:var(--radius);padding:14px;margin-top:8px;box-shadow:var(--shadow-sm);border:0.5px solid rgba(46,48,66,0.07)">
+      <div class="field"><label class="label">New password</label><input type="password" id="cp-new" placeholder="Min 6 characters"></div>
+      <div class="field"><label class="label">Confirm password</label><input type="password" id="cp-confirm" placeholder="Confirm new password"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1" onclick="document.getElementById('change-password-form').style.display='none'">Cancel</button>
+        <button class="btn btn-primary" style="flex:2" onclick="changePassword()">Save password</button>
+      </div>
+      <div id="cp-message" style="margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="settings-section">
     <div class="settings-section-title">App</div>
     <div class="settings-card">
       <div class="settings-row" style="cursor:pointer" onclick="if(confirm('Reset all app data? This cannot be undone.')){localStorage.clear();location.reload();}">
@@ -2419,6 +2437,33 @@ function renderSettings(){
     </div>
   </div>`;
 }
+function showChangePasswordForm(){
+  const form=document.getElementById('change-password-form');
+  if(form)form.style.display=form.style.display==='none'?'block':'none';
+}
+
+async function changePassword(){
+  const p1=document.getElementById('cp-new').value;
+  const p2=document.getElementById('cp-confirm').value;
+  const msgEl=document.getElementById('cp-message');
+  if(p1.length<6){if(msgEl)msgEl.innerHTML='<div style="color:var(--red);font-size:13px">Password must be at least 6 characters</div>';return;}
+  if(p1!==p2){if(msgEl)msgEl.innerHTML='<div style="color:var(--red);font-size:13px">Passwords do not match</div>';return;}
+  if(msgEl)msgEl.innerHTML='<div style="color:var(--gold);font-size:13px">Saving...</div>';
+  try{
+    const {error}=await _sb.auth.updateUser({password:p1});
+    if(error)throw error;
+    if(msgEl)msgEl.innerHTML='<div style="color:#34c759;font-size:13px">✓ Password updated successfully!</div>';
+    document.getElementById('cp-new').value='';
+    document.getElementById('cp-confirm').value='';
+    setTimeout(()=>{
+      document.getElementById('change-password-form').style.display='none';
+      if(msgEl)msgEl.innerHTML='';
+    },2000);
+  }catch(e){
+    if(msgEl)msgEl.innerHTML=`<div style="color:var(--red);font-size:13px">${e.message}</div>`;
+  }
+}
+
 function toggleKeto(val){
   const p=getProfile();p.ketoMode=val;saveProfile(p);renderSettings();
 }
