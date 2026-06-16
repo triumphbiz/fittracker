@@ -2643,19 +2643,24 @@ async function register(){
   if(password!==confirm){showAuthMsg('register-message','Passwords do not match');return;}
   showAuthMsg('register-message','Creating your account...','success');
   try{
-    const {data,error}=await _sb.auth.signUp({email,password});
-    if(error)throw error;
-    // Save name to profile immediately
-    if(data.user){
-      _currentUser=data.user;
+    // Step 1: Sign up
+    const {data:signUpData,error:signUpError}=await _sb.auth.signUp({email,password});
+    if(signUpError)throw signUpError;
+    // Step 2: Immediately sign in with the same credentials
+    const {data:signInData,error:signInError}=await _sb.auth.signInWithPassword({email,password});
+    if(signInError)throw signInError;
+    // Step 3: Save profile with name
+    if(signInData.user){
+      _currentUser=signInData.user;
       const profile={name,units:'kg',ketoMode:false,isCoach:false,cal:2000};
       sd('ft_profile',profile);
-      await _sb.from('profiles_data').upsert({user_id:data.user.id,data:profile,updated_at:new Date().toISOString()});
+      await _sb.from('profiles_data').upsert({user_id:signInData.user.id,data:profile,updated_at:new Date().toISOString()});
+      // Step 4: Handle user (show onboarding etc)
+      await handleUser(signInData.user);
     }
-    showAuthMsg('register-message','Account created! Signing you in...','success');
   }catch(e){
     let msg=e.message;
-    if(msg.includes('already registered'))msg='An account with this email already exists. Please sign in.';
+    if(msg.includes('already registered')||msg.includes('already been registered'))msg='An account with this email already exists. Please sign in.';
     showAuthMsg('register-message',msg);
   }
 }
