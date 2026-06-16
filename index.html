@@ -672,6 +672,21 @@ textarea{min-height:60px;resize:none;line-height:1.4}
       <button class="btn btn-sm" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:rgba(245,240,233,0.8);font-size:12px;width:100%" onclick="showLoginForm()">← Back to sign in</button>
       <div id="forgot-message"></div>
     </div>
+
+    <!-- SET NEW PASSWORD FORM (shown after reset link click) -->
+    <div id="auth-newpass-form" style="display:none;width:100%">
+      <div style="font-size:18px;font-weight:700;color:#fff;margin-bottom:8px">🔐 Set new password</div>
+      <div style="font-size:13px;color:rgba(245,240,233,0.75);margin-bottom:16px">Choose a new password for your account.</div>
+      <div class="auth-card">
+        <label style="font-size:12px;color:rgba(245,240,233,0.75);font-weight:600;text-transform:uppercase;letter-spacing:0.3px">New password</label>
+        <input class="auth-input" type="password" id="newpass-1" placeholder="Min 6 characters">
+        <div style="height:10px"></div>
+        <label style="font-size:12px;color:rgba(245,240,233,0.75);font-weight:600;text-transform:uppercase;letter-spacing:0.3px">Confirm new password</label>
+        <input class="auth-input" type="password" id="newpass-2" placeholder="Confirm password" onkeydown="if(event.key==='Enter')saveNewPassword()">
+      </div>
+      <button class="btn btn-amber" style="width:100%;padding:14px;font-size:16px;border-radius:12px;margin-bottom:10px" onclick="saveNewPassword()">Save new password →</button>
+      <div id="newpass-message"></div>
+    </div>
   </div>
 </div>
 
@@ -2600,6 +2615,43 @@ function showLoginForm(){
   document.getElementById('auth-login-form').style.display='block';
   document.getElementById('auth-register-form').style.display='none';
   document.getElementById('auth-forgot-form').style.display='none';
+  const np=document.getElementById('auth-newpass-form');if(np)np.style.display='none';
+}
+
+function showNewPasswordForm(){
+  // Make sure auth screen is visible
+  const authEl=document.getElementById('auth-screen');
+  if(authEl)authEl.style.display='flex';
+  const nav=document.querySelector('.nav-bar');
+  if(nav)nav.style.display='none';
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  // Hide all other forms
+  ['auth-login-form','auth-register-form','auth-forgot-form'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.style.display='none';
+  });
+  const np=document.getElementById('auth-newpass-form');
+  if(np)np.style.display='block';
+}
+
+async function saveNewPassword(){
+  const p1=document.getElementById('newpass-1').value;
+  const p2=document.getElementById('newpass-2').value;
+  if(p1.length<6){showAuthMsg('newpass-message','Password must be at least 6 characters');return;}
+  if(p1!==p2){showAuthMsg('newpass-message','Passwords do not match');return;}
+  showAuthMsg('newpass-message','Saving...','success');
+  try{
+    const {error}=await _sb.auth.updateUser({password:p1});
+    if(error)throw error;
+    showAuthMsg('newpass-message','✓ Password saved! Signing you in...','success');
+    // Get current session and handle user
+    setTimeout(async()=>{
+      const {data:{session}}=await _sb.auth.getSession();
+      if(session){await handleUser(session.user);}
+      else{showLoginForm();showAuthMsg('login-message','Password updated. Please sign in.','success');}
+    },1000);
+  }catch(e){
+    showAuthMsg('newpass-message',e.message);
+  }
 }
 function showRegisterForm(){
   document.getElementById('auth-login-form').style.display='none';
@@ -2692,16 +2744,28 @@ async function signOut(){
 }
 
 function showAuthScreen(){
-  document.getElementById('auth-screen').style.display='flex';
-  document.getElementById('auth-login-form').style.display='block';
-  document.getElementById('auth-success-form').style.display='none';
-  document.querySelector('.nav-bar').style.display='none';
+  const authEl=document.getElementById('auth-screen');
+  if(authEl)authEl.style.display='flex';
+  const loginForm=document.getElementById('auth-login-form');
+  if(loginForm)loginForm.style.display='block';
+  const regForm=document.getElementById('auth-register-form');
+  if(regForm)regForm.style.display='none';
+  const forgotForm=document.getElementById('auth-forgot-form');
+  if(forgotForm)forgotForm.style.display='none';
+  const nav=document.querySelector('.nav-bar');
+  if(nav)nav.style.display='none';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  // Clear any messages
+  ['login-message','register-message','forgot-message'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.innerHTML='';
+  });
 }
 
 function hideAuthScreen(){
-  document.getElementById('auth-screen').style.display='none';
-  document.querySelector('.nav-bar').style.display='flex';
+  const authEl=document.getElementById('auth-screen');
+  if(authEl)authEl.style.display='none';
+  const nav=document.querySelector('.nav-bar');
+  if(nav)nav.style.display='flex';
 }
 
 async function handleUser(user){
@@ -2776,7 +2840,7 @@ async function showCoachDashboard(){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.getElementById('p-coach').classList.add('active');
   document.getElementById('p-coach').style.display='block';
-  document.querySelector('.nav-bar').style.display='none';
+  const nav=document.querySelector('.nav-bar');if(nav)nav.style.display='none';
   await loadCoachDashboard();
 }
 
@@ -2784,7 +2848,7 @@ function switchToMyApp(){
   // Switch from coach dashboard to personal training app
   document.getElementById('p-coach').classList.remove('active');
   document.getElementById('p-coach').style.display='none';
-  document.querySelector('.nav-bar').style.display='flex';
+  const nav2=document.querySelector('.nav-bar');if(nav2)nav2.style.display='flex';
   // Show coach return options
   const coachMenuItem=document.getElementById('coach-dashboard-menu-item');
   if(coachMenuItem)coachMenuItem.style.display='flex';
@@ -2999,9 +3063,8 @@ window.addEventListener('load',async()=>{
     } else if(event==='SIGNED_OUT'){
       showAuthScreen();
     } else if(event==='PASSWORD_RECOVERY'){
-      // Handle password reset - show a reset form
-      showAuthScreen();
-      showAuthMsg('login-message','Please set your new password below.','success');
+      // Show the set new password form
+      showNewPasswordForm();
     }
   });
 });
