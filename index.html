@@ -1297,9 +1297,61 @@ function getLastSession(progId,exName){
 function renderLogPage(){
   const progs=getProgs();const wrap=document.getElementById('log-wrap');
   if(!progs.length){wrap.innerHTML=`<div class="card" style="text-align:center;padding:28px 16px"><div style="font-size:48px;margin-bottom:12px">🏋️</div><div class="empty-title">No programs yet</div><div class="empty-sub">Create a program first, then log your workouts here.</div><button class="btn btn-primary" style="padding:12px 28px;width:100%" onclick="showPage('programs');setTimeout(openProgModal,80)">+ Create your first program</button></div>`;return;}
-  wrap.innerHTML=`<div class="card"><div class="field"><label class="label">Program</label><select id="log-prog-sel" onchange="loadLogForm()">${progs.map(p=>`<option value="${p.id}">${p.name}</option>`).join('')}</select></div><div id="log-form"></div></div>`;
+  const draft=getLogDraft();
+  const selectedProgId=draft&&draft.progId&&progs.some(p=>p.id===draft.progId)?draft.progId:progs[0].id;
+  wrap.innerHTML=`<div class="card"><div class="field"><label class="label">Program</label><select id="log-prog-sel" onchange="clearLogDraft();loadLogForm()">${progs.map(p=>`<option value="${p.id}" ${p.id===selectedProgId?'selected':''}>${p.name}</option>`).join('')}</select></div><div id="log-form"></div></div>`;
   loadLogForm();
 }
+
+/* ── DRAFT AUTO-SAVE (prevents data loss if the app loses focus/reloads) ── */
+function getLogDraft(){return gd('ft_log_draft',null);}
+function clearLogDraft(){localStorage.removeItem('ft_log_draft');}
+function saveLogDraftNow(){
+  const formEl=document.getElementById('log-form');
+  const progSel=document.getElementById('log-prog-sel');
+  if(!formEl||!progSel)return;
+  const inputs=formEl.querySelectorAll('input,select');
+  const values={};
+  inputs.forEach(inp=>{if(inp.id)values[inp.id]=inp.value;});
+  sd('ft_log_draft',{progId:progSel.value,values,savedAt:Date.now()});
+}
+let _draftSaveTimer=null;
+function scheduleDraftSave(){
+  clearTimeout(_draftSaveTimer);
+  _draftSaveTimer=setTimeout(saveLogDraftNow,400);
+}
+function restoreLogDraft(){
+  const draft=getLogDraft();
+  if(!draft||!draft.values)return;
+  let restoredAny=false;
+  Object.keys(draft.values).forEach(id=>{
+    const el=document.getElementById(id);
+    if(el&&draft.values[id]){el.value=draft.values[id];restoredAny=true;}
+  });
+  if(restoredAny){
+    const formEl=document.getElementById('log-form');
+    if(formEl){
+      const banner=document.createElement('div');
+      banner.style.cssText='background:#fff3e0;border:0.5px solid var(--gold);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:var(--navy);display:flex;align-items:center;justify-content:space-between';
+      banner.innerHTML='<span>↩️ Restored your unsaved entries</span><button class="btn btn-sm" style="padding:3px 8px;font-size:11px;border-color:rgba(46,48,66,0.15)" onclick="this.parentElement.remove()">Dismiss</button>';
+      formEl.insertBefore(banner,formEl.firstChild);
+    }
+  }
+}
+// Auto-save on every input/change inside the log form
+document.addEventListener('input',e=>{
+  if(e.target.closest&&e.target.closest('#log-form'))scheduleDraftSave();
+});
+document.addEventListener('change',e=>{
+  if(e.target.closest&&e.target.closest('#log-form'))scheduleDraftSave();
+});
+// Save immediately if the app is about to be hidden/backgrounded
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'){
+    const formEl=document.getElementById('log-form');
+    if(formEl)saveLogDraftNow();
+  }
+});
 function loadLogForm(){
   const pid=document.getElementById('log-prog-sel').value;
   const formEl=document.getElementById('log-form');
@@ -1335,6 +1387,7 @@ function loadLogForm(){
   });
   html+=`<div style="display:flex;gap:8px;margin-top:8px"><button class="btn btn-danger" style="flex:1" onclick="discardLog()">✕ Discard</button><button class="btn btn-primary" style="flex:2" onclick="saveLog()">💾 Save workout</button></div>`;
   formEl.innerHTML=html;
+  restoreLogDraft();
 }
 function saveLog(){
   const pid=document.getElementById('log-prog-sel').value;
@@ -1352,6 +1405,7 @@ function saveLog(){
   const sched=getSchedule();const si=sched.findIndex(s=>s.date===logDate&&s.progId===pid&&!s.done);
   if(si>-1){sched[si].done=true;saveSchedule2(sched);}
   const newPR=checkPRs(exercises);
+  clearLogDraft();
   showWorkoutSuccess(p.name,logDate,newPR,exercises);
 }
 function showWorkoutSuccess(progName,date,newPR,exercises){
@@ -1423,7 +1477,7 @@ function showWorkoutSuccess(progName,date,newPR,exercises){
     </div>
   </div>`;
 }
-function discardLog(){if(confirm('Discard this workout?'))renderLogPage();}
+function discardLog(){if(confirm('Discard this workout?')){clearLogDraft();renderLogPage();}}
 function checkPRs(exercises){
   const prs=getPRs();let hit=false;
   exercises.forEach(ex=>{if(ex.type==='strength'){const best=Math.max(...ex.sets.map(s=>s.weight));if(best>0&&(!prs[ex.name]||best>prs[ex.name].weight)){prs[ex.name]={weight:best,reps:ex.sets.find(s=>s.weight===best)?.reps||0,date:today()};hit=true;}}});
@@ -1563,21 +1617,61 @@ function handlePhotoSelect(event){
   const file=event.target.files[0];if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    photoData[currentPhotoSlot]=e.target.result;
-    const preview=document.getElementById('photo-preview-'+currentPhotoSlot);
-    const plus=document.getElementById('photo-slot-'+currentPhotoSlot).querySelector('.photo-add-icon');
-    preview.src=e.target.result;preview.style.display='block';
-    if(plus)plus.style.display='none';
+    compressImage(e.target.result,800,0.6).then(compressed=>{
+      photoData[currentPhotoSlot]=compressed;
+      const preview=document.getElementById('photo-preview-'+currentPhotoSlot);
+      const plus=document.getElementById('photo-slot-'+currentPhotoSlot).querySelector('.photo-add-icon');
+      preview.src=compressed;preview.style.display='block';
+      if(plus)plus.style.display='none';
+    });
   };
   reader.readAsDataURL(file);
   event.target.value='';
 }
-function savePhotos(){
+
+function compressImage(dataUrl,maxDim,quality){
+  return new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>h&&w>maxDim){h=Math.round(h*maxDim/w);w=maxDim;}
+      else if(h>maxDim){w=Math.round(w*maxDim/h);h=maxDim;}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.onerror=()=>resolve(dataUrl); // fallback to original if compression fails
+    img.src=dataUrl;
+  });
+}
+async function savePhotos(){
   const date=document.getElementById('photo-date').value;
   if(!photoData.some(p=>p)){alert('Please select at least one photo');return;}
+  const btn=event?event.currentTarget:null;
+  if(btn){btn.textContent='Saving...';btn.disabled=true;}
   const photos=getPhotos().filter(p=>p.date!==date);
   photos.push({date,images:photoData});photos.sort((a,b)=>a.date.localeCompare(b.date));
-  savePhotos2(photos);alert('Photos saved!');renderPhotoHistory();
+  // Save locally first (always works)
+  sd('ft_photos',photos);
+  // Try to sync to Supabase directly (not debounced) so we know if it succeeds
+  if(_currentUser){
+    try{
+      const {error}=await _sb.from('progress_photos_bulk').upsert({
+        user_id:_currentUser.id,id:_currentUser.id+'_photos',data:photos,updated_at:new Date().toISOString()
+      });
+      if(error)throw error;
+      alert('✓ Photos saved and synced!');
+    }catch(e){
+      console.warn('Photo sync error:',e);
+      alert('Photos saved on this device, but failed to sync to the cloud (likely too large). They will only be visible on this device for now.');
+    }
+  } else {
+    alert('Photos saved on this device.');
+  }
+  if(btn){btn.textContent='Save photos';btn.disabled=false;}
+  renderPhotoHistory();
 }
 function deletePhotoEntry(date){if(!confirm('Delete photos for this date?'))return;savePhotos2(getPhotos().filter(p=>p.date!==date));renderPhotoHistory();}
 
@@ -2416,6 +2510,11 @@ function renderSettings(){
         <span class="settings-row-label">Change password</span>
         <span style="color:rgba(46,48,66,0.3)">›</span>
       </div>
+      <div class="settings-row" style="cursor:pointer" onclick="loadStarterPrograms()">
+        <span class="settings-row-label">Load starter programs</span>
+        <div style="font-size:11px;color:rgba(46,48,66,0.45)">Bodyweight, Gym & Home Dumbbell</div>
+        <span style="color:rgba(46,48,66,0.3)">›</span>
+      </div>
     </div>
     <div id="change-password-form" style="display:none;background:var(--white);border-radius:var(--radius);padding:14px;margin-top:8px;box-shadow:var(--shadow-sm);border:0.5px solid rgba(46,48,66,0.07)">
       <div class="field"><label class="label">New password</label><input type="password" id="cp-new" placeholder="Min 6 characters"></div>
@@ -2437,6 +2536,72 @@ function renderSettings(){
     </div>
   </div>`;
 }
+async function loadStarterPrograms(){
+  if(!confirm('This will add the 3 starter programs to your account. Any existing programs will be kept. Continue?'))return;
+  const existing=getProgs();
+  const existingNames=existing.map(p=>p.name);
+  const starters=[
+    {
+      id:'default_bw_'+Date.now(),
+      name:'Bodyweight Full Body',
+      cat:'full',
+      defaultSets:3,
+      description:'All exercises can be modified to suit your fitness level. Ask your coach for modifications.',
+      exercises:[
+        {name:'Squat',type:'strength'},
+        {name:'Push Up',type:'strength'},
+        {name:'Assisted Split Squat',type:'strength'},
+        {name:'Glute Bridge',type:'strength'},
+        {name:'Shoulder Taps',type:'core'},
+        {name:'Bird Dog',type:'core'},
+        {name:'Plank',type:'core'},
+        {name:'Dead Bug',type:'core'},
+      ]
+    },
+    {
+      id:'default_gym_'+(Date.now()+1),
+      name:'Gym Full Body',
+      cat:'full',
+      defaultSets:3,
+      description:'',
+      exercises:[
+        {name:'Leg Press',type:'strength'},
+        {name:'Seated Leg Curl',type:'strength'},
+        {name:'Bicep Curls',type:'strength'},
+        {name:'Seated Cable Row',type:'strength'},
+        {name:'Dumbbell Bench Press',type:'strength'},
+        {name:'Hip Thrust',type:'strength'},
+        {name:'Plank Hold',type:'core'},
+        {name:'Dead Bug',type:'core'},
+      ]
+    },
+    {
+      id:'default_home_'+(Date.now()+2),
+      name:'Home Dumbbell & Bands',
+      cat:'full',
+      defaultSets:3,
+      description:'',
+      exercises:[
+        {name:'Weighted Goblet Squat',type:'strength'},
+        {name:'Resistance Band Pull Apart',type:'strength'},
+        {name:'Weighted Pullover',type:'strength'},
+        {name:'Resistance Band Row',type:'strength'},
+        {name:'Band Tricep Pushdown',type:'strength'},
+        {name:'Resistance Band Glute Kickback',type:'strength'},
+        {name:'Standing Cross Crunches',type:'core'},
+        {name:'Standing Wood Chop (Band)',type:'core'},
+      ]
+    }
+  ];
+  // Only add ones that don't already exist by name
+  const toAdd=starters.filter(s=>!existingNames.includes(s.name));
+  if(!toAdd.length){alert('You already have all 3 starter programs!');return;}
+  const updated=[...existing,...toAdd];
+  await saveProgs(updated);
+  alert(toAdd.length+' starter program'+(toAdd.length>1?'s':'')+' added! Go to Programs to see them.');
+  renderSettings();
+}
+
 function showChangePasswordForm(){
   const form=document.getElementById('change-password-form');
   if(form)form.style.display=form.style.display==='none'?'block':'none';
