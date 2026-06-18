@@ -1299,7 +1299,7 @@ function renderLogPage(){
   if(!progs.length){wrap.innerHTML=`<div class="card" style="text-align:center;padding:28px 16px"><div style="font-size:48px;margin-bottom:12px">🏋️</div><div class="empty-title">No programs yet</div><div class="empty-sub">Create a program first, then log your workouts here.</div><button class="btn btn-primary" style="padding:12px 28px;width:100%" onclick="showPage('programs');setTimeout(openProgModal,80)">+ Create your first program</button></div>`;return;}
   const draft=getLogDraft();
   const selectedProgId=draft&&draft.progId&&progs.some(p=>p.id===draft.progId)?draft.progId:progs[0].id;
-  wrap.innerHTML=`<div class="card"><div class="field"><label class="label">Program</label><select id="log-prog-sel" onchange="clearLogDraft();loadLogForm()">${progs.map(p=>`<option value="${p.id}" ${p.id===selectedProgId?'selected':''}>${p.name}</option>`).join('')}</select></div><div id="log-form"></div></div>`;
+  wrap.innerHTML=`<div class="card"><div class="field"><label class="label">Program</label><select id="log-prog-sel" onchange="clearTimeout(_draftSaveTimer);clearLogDraft();loadLogForm()">${progs.map(p=>`<option value="${p.id}" ${p.id===selectedProgId?'selected':''}>${p.name}</option>`).join('')}</select></div><div id="log-form"></div></div>`;
   loadLogForm();
 }
 
@@ -1405,6 +1405,7 @@ function saveLog(){
   const sched=getSchedule();const si=sched.findIndex(s=>s.date===logDate&&s.progId===pid&&!s.done);
   if(si>-1){sched[si].done=true;saveSchedule2(sched);}
   const newPR=checkPRs(exercises);
+  clearTimeout(_draftSaveTimer);
   clearLogDraft();
   showWorkoutSuccess(p.name,logDate,newPR,exercises);
 }
@@ -1477,7 +1478,7 @@ function showWorkoutSuccess(progName,date,newPR,exercises){
     </div>
   </div>`;
 }
-function discardLog(){if(confirm('Discard this workout?')){clearLogDraft();renderLogPage();}}
+function discardLog(){if(confirm('Discard this workout?')){clearTimeout(_draftSaveTimer);clearLogDraft();renderLogPage();}}
 function checkPRs(exercises){
   const prs=getPRs();let hit=false;
   exercises.forEach(ex=>{if(ex.type==='strength'){const best=Math.max(...ex.sets.map(s=>s.weight));if(best>0&&(!prs[ex.name]||best>prs[ex.name].weight)){prs[ex.name]={weight:best,reps:ex.sets.find(s=>s.weight===best)?.reps||0,date:today()};hit=true;}}});
