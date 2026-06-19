@@ -2197,7 +2197,7 @@ async function startScanner(date,mi){
     if(e.name==='NotAllowedError')msg='Camera permission was denied.<br>Check your browser/app settings to allow camera access, then try again.';
     else if(e.name==='NotFoundError')msg='No camera was found on this device.<br>Please use Search instead.';
     else if(e.name==='NotReadableError')msg='Camera is already in use by another app.<br>Close other apps using the camera and try again.';
-    container.innerHTML=`<div style="text-align:center;padding:12px;font-size:13px;color:var(--red)">${msg}</div>`;
+    container.innerHTML=`<div style="text-align:center;padding:12px;font-size:13px;color:var(--red)">${msg}<br><br><span style="font-size:10px;color:rgba(46,48,66,0.5)">Debug: ${e.name||'no name'} — ${e.message||'no message'}</span></div>`;
     return;
   }
   container.innerHTML=`<div class="scanner-wrap" id="scanner-video-wrap">
