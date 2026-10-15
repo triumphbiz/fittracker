@@ -2534,7 +2534,7 @@ function renderSettings(){
       </div>
       <div class="settings-row" style="cursor:pointer" onclick="loadStarterPrograms()">
         <span class="settings-row-label">Load starter programs</span>
-        <div style="font-size:11px;color:rgba(46,48,66,0.45)">Bodyweight, Gym & Home Dumbbell</div>
+        <div style="font-size:11px;color:rgba(46,48,66,0.45)">Bodyweight, Gym, Home Dumbbell & Push/Pull/Legs</div>
         <span style="color:rgba(46,48,66,0.3)">›</span>
       </div>
     </div>
@@ -2559,7 +2559,7 @@ function renderSettings(){
   </div>`;
 }
 async function loadStarterPrograms(){
-  if(!confirm('This will add the 3 starter programs to your account. Any existing programs will be kept. Continue?'))return;
+  if(!confirm('This will add the 6 starter programs to your account. Any existing programs will be kept. Continue?'))return;
   const existing=getProgs();
   const existingNames=existing.map(p=>p.name);
   const starters=[
@@ -2613,11 +2613,62 @@ async function loadStarterPrograms(){
         {name:'Standing Cross Crunches',type:'core'},
         {name:'Standing Wood Chop (Band)',type:'core'},
       ]
+    },
+    {
+      id:'default_push_'+(Date.now()+3),
+      name:'Gym Push',
+      cat:'upper',
+      defaultSets:3,
+      description:'Part of a Push / Pull / Legs split. Rotate through all three across your week. Ask your coach for modifications.',
+      exercises:[
+        {name:'Dumbbell Bench Press',type:'strength'},
+        {name:'Seated Shoulder Press (Machine)',type:'strength'},
+        {name:'Incline Dumbbell Press',type:'strength'},
+        {name:'Cable Chest Fly',type:'strength'},
+        {name:'Lateral Raise',type:'strength'},
+        {name:'Cable Tricep Pushdown',type:'strength'},
+        {name:'Pallof Press',type:'core'},
+        {name:'Plank Hold',type:'core'},
+      ]
+    },
+    {
+      id:'default_pull_'+(Date.now()+4),
+      name:'Gym Pull',
+      cat:'upper',
+      defaultSets:3,
+      description:'Part of a Push / Pull / Legs split. Rotate through all three across your week. Ask your coach for modifications.',
+      exercises:[
+        {name:'Lat Pulldown',type:'strength'},
+        {name:'Seated Cable Row',type:'strength'},
+        {name:'Single Arm Dumbbell Row',type:'strength'},
+        {name:'Face Pull',type:'strength'},
+        {name:'Rear Delt Fly (Machine)',type:'strength'},
+        {name:'Bicep Curls',type:'strength'},
+        {name:'Dead Bug',type:'core'},
+        {name:'Bird Dog',type:'core'},
+      ]
+    },
+    {
+      id:'default_legs_'+(Date.now()+5),
+      name:'Gym Legs',
+      cat:'lower',
+      defaultSets:3,
+      description:'Part of a Push / Pull / Legs split. Rotate through all three across your week. Ask your coach for modifications.',
+      exercises:[
+        {name:'Leg Press',type:'strength'},
+        {name:'Goblet Squat',type:'strength'},
+        {name:'Romanian Deadlift (Dumbbell)',type:'strength'},
+        {name:'Hip Thrust',type:'strength'},
+        {name:'Seated Leg Curl',type:'strength'},
+        {name:'Cable Glute Kickback',type:'strength'},
+        {name:'Side Plank',type:'core'},
+        {name:'Glute Bridge Hold',type:'core'},
+      ]
     }
   ];
   // Only add ones that don't already exist by name
   const toAdd=starters.filter(s=>!existingNames.includes(s.name));
-  if(!toAdd.length){alert('You already have all 3 starter programs!');return;}
+  if(!toAdd.length){alert('You already have all 6 starter programs!');return;}
   const updated=[...existing,...toAdd];
   await saveProgs(updated);
   alert(toAdd.length+' starter program'+(toAdd.length>1?'s':'')+' added! Go to Programs to see them.');
